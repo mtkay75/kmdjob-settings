@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>감시 설정</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root {
+  --bg: var(--tg-theme-secondary-bg-color, #f1f2f6);
+  --card: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #ffffff));
+  --text: var(--tg-theme-text-color, #1c1c1e);
+  --hint: var(--tg-theme-hint-color, #8a8a8e);
+  --accent: var(--tg-theme-button-color, #2481cc);
+  --accent-text: var(--tg-theme-button-text-color, #ffffff);
+  --sep: var(--tg-theme-section-separator-color, rgba(127,127,127,.22));
+  --warn: #c62828;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; }
+body { padding: 0 12px calc(84px + env(safe-area-inset-bottom)); word-break: keep-all; overflow-wrap: anywhere; }
+header { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0 8px; }
+.tabs { display: flex; gap: 6px; background: var(--card); border-radius: 12px; padding: 4px; }
+.tab { flex: 1; border: 0; border-radius: 9px; padding: 9px 0; font: inherit; font-weight: 600;
+  background: transparent; color: var(--hint); }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
+.summary { margin: 10px 2px 0; font-size: 13px; color: var(--hint); }
+.summary b { color: var(--text); font-weight: 600; }
+.notice { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--card);
+  border-left: 4px solid var(--warn); font-size: 13px; }
+.tools { display: flex; gap: 6px; margin: 10px 0 4px; }
+.tools button, .tools input { font: inherit; font-size: 14px; border-radius: 10px; border: 1px solid var(--sep);
+  background: var(--card); color: var(--text); padding: 8px 10px; }
+.tools input { flex: 1; min-width: 0; }
+.tools button { flex: none; }
+.card { background: var(--card); border-radius: 12px; margin: 8px 0; overflow: hidden; }
+.head { display: flex; align-items: center; gap: 10px; padding: 11px 12px; cursor: pointer; user-select: none; }
+.head .name { flex: 1; font-weight: 600; }
+.head .count { font-size: 13px; color: var(--hint); }
+.chev { color: var(--hint); transition: transform .15s; }
+.card.open .chev { transform: rotate(90deg); }
+.box { width: 22px; height: 22px; flex: none; border-radius: 6px; border: 2px solid var(--hint);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700;
+  color: var(--accent-text); }
+.box.on { background: var(--accent); border-color: var(--accent); }
+.box.part { background: var(--accent); border-color: var(--accent); opacity: .55; }
+.chips { display: none; flex-wrap: wrap; gap: 6px; padding: 0 12px 12px; }
+.card.open .chips { display: flex; }
+.chip { border: 1px solid var(--sep); border-radius: 999px; padding: 6px 11px; font: inherit; font-size: 14px;
+  background: transparent; color: var(--text); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.chip .plus { opacity: .7; margin-right: 1px; }
+.legend { font-size: 12px; color: var(--hint); margin: 6px 2px 0; }
+.pos { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-top: 1px solid var(--sep); cursor: pointer; }
+.pos:first-child { border-top: 0; }
+.pos .t { font-weight: 600; }
+.pos .d { font-size: 13px; color: var(--hint); }
+.hidden { display: none !important; }
+#fallback { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); }
+#fallback button { width: 100%; border: 0; border-radius: 12px; padding: 14px; font: inherit; font-weight: 600;
+  background: var(--accent); color: var(--accent-text); }
+#fallback button:disabled { opacity: .45; }
+#fallback .why { text-align: center; font-size: 12px; color: var(--hint); margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="tabs" role="tablist">
+    <button class="tab" id="tab-region" role="tab">감시 지역</button>
+    <button class="tab" id="tab-pos" role="tab">대상 포지션</button>
+  </div>
+  <div class="summary" id="summary"></div>
+  <div class="notice hidden" id="notice"></div>
+</header>
+
+<section id="page-region">
+  <div class="tools">
+    <input id="q" type="search" placeholder="시군·구 찾기 (예: 순천, 강남)" autocomplete="off">
+    <button id="all-on">전국</button>
+    <button id="all-off">전체 해제</button>
+  </div>
+  <div class="legend">권역 이름을 누르면 시군이 펼쳐집니다. <b>+</b> 표시는 다른 권역 소속이라 함께 켜지고 꺼집니다.</div>
+  <div id="regions"></div>
+</section>
+
+<section id="page-pos" class="hidden">
+  <div class="tools">
+    <button id="pos-all">모두 선택</button>
+    <button id="pos-none">모두 해제</button>
+  </div>
+  <div class="card" id="positions"></div>
+</section>
+
+<div id="fallback" class="hidden">
+  <button id="fallback-save" disabled>저장</button>
+  <div class="why" id="fallback-why"></div>
+</div>
+
+<script>
+"use strict";
+var DATA = {"version":1,"hash":"43806aaa","positions":[{"id":"duty","name":"야간당직","desc":"모든 당직 (당직대진 제외)"},{"id":"yoyang","name":"요양병원 주간진료","desc":"요양병원 한의과 주간 상근 진료"},{"id":"regular","name":"정규 진료","desc":"한의원, 한방병원, 병원(요양병원 제외)의 주간 상근 진료"},{"id":"daejin","name":"단기대진","desc":"한 달 미만 또는 날짜가 정해진 모든 대진 (당직대진 포함)"},{"id":"long","name":"장기대진","desc":"한 달 이상 지속되는 대진 (당직대진 포함)"},{"id":"visit","name":"방문진료","desc":"재택의료센터·가정방문진료 전담"},{"id":"etc","name":"기타","desc":"위 분류에 해당하지 않는 모든 포지션 (검진, 연구, 강사 등)"}],"posOrder":[2,1,0,3,4,5,6],"units":["종로구","중구","용산구","성동구","광진구","동대문구","중랑구","성북구","강북구","도봉구","노원구","은평구","서대문구","마포구","양천구","강서구","구로구","금천구","영등포구","동작구","관악구","서초구","강남구","송파구","강동구","부산","대구","인천","광주","대전","울산","세종","군위","수원","성남","의정부","안양","부천","광명","평택","동두천","안산","고양","과천","구리","남양주","오산","시흥","군포","의왕","하남","용인","파주","이천","안성","김포","화성","경기광주","양주","포천","여주","연천","가평","양평","춘천","원주","강릉","동해","태백","속초","삼척","홍천","횡성","영월","평창","정선","철원","화천","양구","인제","강원고성","양양","청주","충주","제천","보은","옥천","영동","증평","진천","괴산","음성","단양","천안","공주","보령","아산","서산","논산","계룡","당진","금산","부여","서천","청양","홍성","예산","태안","전주","군산","익산","정읍","남원","김제","완주","진안","무주","장수","임실","순창","고창","부안","목포","여수","순천","나주","광양","담양","곡성","구례","고흥","보성","화순","장흥","강진","해남","영암","무안","함평","영광","장성","완도","진도","신안","포항","경주","김천","안동","구미","영주","영천","상주","문경","경산","의성","청송","영양","영덕","청도","고령","성주","칠곡","예천","봉화","울진","울릉","창원","진주","통영","사천","김해","밀양","거제","양산","의령","함안","창녕","경남고성","남해","하동","산청","함양","거창","합천","제주","서귀포"],"regions":[{"name":"서울 도심권","label":"서울 도심권","p":[0,1,2],"x":[]},{"name":"서울 동북권","label":"서울 동북권","p":[9,10,8,7,5,6,3,4],"x":[35,44,45]},{"name":"서울 서북권","label":"서울 서북권","p":[11,12,13],"x":[42]},{"name":"서울 서남권","label":"서울 서남권","p":[15,14,16,18,19,20,17],"x":[38,37,55]},{"name":"서울 동남권","label":"서울 동남권","p":[21,22,23,24],"x":[43,34,50]},{"name":"인천권","label":"인천권","p":[27,37,55],"x":[]},{"name":"파주일산","label":"파주일산(경기)","p":[42,52],"x":[55]},{"name":"경기북부","label":"경기북부","p":[35,58,40,59,61,76],"x":[]},{"name":"남양주권","label":"남양주권(경기)","p":[45,44,63],"x":[62]},{"name":"분당하남","label":"분당하남(경기)","p":[34,50,57,53,60],"x":[51,63]},{"name":"안양안산","label":"안양안산(경기)","p":[43,38,47,36,41,48,49],"x":[]},{"name":"수원용인","label":"수원용인(경기)","p":[33,51,56,46],"x":[49]},{"name":"평택천안","label":"평택천안(경기충남)","p":[39,54,93,96],"x":[46,100]},{"name":"춘천권","label":"춘천권(강원)","p":[64,71,77,78,79,62],"x":[76]},{"name":"원주권","label":"원주권(강원)","p":[65,72,74],"x":[60]},{"name":"충주권","label":"충주권(충북)","p":[83,84,92,73],"x":[91,90]},{"name":"강릉권","label":"강릉권(강원)","p":[66,67,70,68,75],"x":[74,81,164]},{"name":"속초권","label":"속초권(강원)","p":[69,80,81],"x":[79]},{"name":"청주권","label":"청주권(충북)","p":[82,88,89,91,90,85],"x":[31]},{"name":"대전권","label":"대전권(충남)","p":[29,31,94,99,98,102,101,86,87,116],"x":[]},{"name":"서산홍성","label":"서산홍성(충남)","p":[97,107,100,105,106,95,104],"x":[]},{"name":"전주권","label":"전주권(전북)","p":[108,114,110,109,113,121,111,115,118,103],"x":[]},{"name":"남원권","label":"남원권(전북)","p":[112,117,119,181],"x":[118,129,128]},{"name":"광주권","label":"광주권(전남)","p":[28,125,132,127,140,138,139,120,128],"x":[111,119]},{"name":"목포권","label":"목포권(전남)","p":[122,137,143,136,135,134,141,142],"x":[138,133]},{"name":"여순광","label":"여순광(전남)","p":[124,123,126,130,131,133,129],"x":[179]},{"name":"경남서부","label":"경남서부","p":[167,169,178,180,179,183],"x":[174,181,177]},{"name":"마창진","label":"마창진(경남)","p":[166,175,174,171],"x":[170,176,177]},{"name":"통영거제","label":"통영거제(경남)","p":[168,172,177],"x":[]},{"name":"부산권","label":"부산권(경남)","p":[25,170,173],"x":[171]},{"name":"울산권","label":"울산권(경남)","p":[30],"x":[173,145]},{"name":"경북동부","label":"경북동부","p":[144,145,157,164,165],"x":[150]},{"name":"대구권","label":"대구권(경북)","p":[26,32,153,150,158,161,160,159,176],"x":[148,183]},{"name":"경북서부","label":"경북서부","p":[146,148,151,182],"x":[161,160,87,152]},{"name":"경북북부","label":"경북북부","p":[147,162,152,149,163,154,155,156],"x":[32]},{"name":"제주권","label":"제주권","p":[184,185],"x":[]}]};
+var tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+var inTelegram = !!(tg && tg.initData);
+var nPos = DATA.positions.length, nUnit = DATA.units.length, nBits = nPos + nUnit;
+var on = new Array(nBits).fill(false);       // 0..nPos-1 = 포지션, 그 뒤 = 단위
+var dirty = false, tableOk = true, loaded = false;
+
+function params() {
+  var out = {};
+  (location.search || "").replace(/^\?/, "").split("&").forEach(function (kv) {
+    if (!kv) return;
+    var i = kv.indexOf("=");
+    out[decodeURIComponent(i < 0 ? kv : kv.slice(0, i))] = i < 0 ? "" : decodeURIComponent(kv.slice(i + 1));
+  });
+  return out;
+}
+function decodeBits(s) {
+  var b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4) b64 += "=";
+  var bin = atob(b64), bits = [];
+  if (bin.length !== Math.ceil(nBits / 8)) throw new Error("length");
+  for (var i = 0; i < nBits; i++) bits.push(!!(bin.charCodeAt(i >> 3) & (0x80 >> (i & 7))));
+  return bits;
+}
+function encodeBits(bits) {
+  var bytes = new Array(Math.ceil(nBits / 8)).fill(0);
+  for (var i = 0; i < nBits; i++) if (bits[i]) bytes[i >> 3] |= 0x80 >> (i & 7);
+  var bin = bytes.map(function (c) { return String.fromCharCode(c); }).join("");
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function unitOn(u) { return on[nPos + u]; }
+function setUnit(u, v) { on[nPos + u] = v; }
+
+// ---- 요약(봇의 units_text와 같은 규칙) ----
+function unitsText() {
+  var cnt = 0, i;
+  for (i = 0; i < nUnit; i++) if (unitOn(i)) cnt++;
+  if (!cnt) return "지역 없음";
+  if (cnt === nUnit) return "전국";
+  var full = [], covered = {};
+  DATA.regions.forEach(function (r) {
+    if (r.p.every(unitOn)) {
+      full.push(r.name);
+      r.p.forEach(function (u) { covered[u] = 1; });
+      r.x.forEach(function (u) { if (unitOn(u)) covered[u] = 1; });
+    }
+  });
+  var rest = [];
+  for (i = 0; i < nUnit; i++) if (unitOn(i) && !covered[i]) rest.push(i);
+  var parts = [];
+  if (full.length) parts.push(full.slice(0, 4).join("·") + (full.length > 4 ? " 외 " + (full.length - 4) + "개 권역" : ""));
+  if (rest.length) parts.push(rest.length <= 3 ? rest.map(function (u) { return DATA.units[u]; }).join("·") : "시군 " + rest.length + "곳");
+  return parts.join(" + ");
+}
+function positionsText() {
+  var names = [];
+  DATA.posOrder.forEach(function (i) { if (on[i]) names.push(DATA.positions[i].name); });
+  if (!names.length) return "포지션 없음";
+  if (names.length === nPos) return "모든 포지션";
+  return names.join("·");
+}
+
+// ---- 그리기 ----
+var chipEls = [];   // chipEls[u] = [버튼들]
+var cardEls = [];
+function buildRegions() {
+  var root = document.getElementById("regions");
+  DATA.regions.forEach(function (r, ri) {
+    var card = document.createElement("div");
+    card.className = "card";
+    var head = document.createElement("div");
+    head.className = "head";
+    var box = document.createElement("span");
+    box.className = "box";
+    box.setAttribute("role", "checkbox");
+    var name = document.createElement("span");
+    name.className = "name";
+    name.textContent = r.label || r.name;
+    var count = document.createElement("span");
+    count.className = "count";
+    var chev = document.createElement("span");
+    chev.className = "chev";
+    chev.textContent = "›";
+    head.appendChild(box); head.appendChild(name); head.appendChild(count); head.appendChild(chev);
+    var chips = document.createElement("div");
+    chips.className = "chips";
+    r.p.concat(r.x).forEach(function (u, k) {
+      var b = document.createElement("button");
+      b.className = "chip";
+      b.dataset.u = u;
+      if (k >= r.p.length) {
+        var plus = document.createElement("span");
+        plus.className = "plus";
+        plus.textContent = "+";
+        b.appendChild(plus);
+      }
+      b.appendChild(document.createTextNode(DATA.units[u]));
+      b.addEventListener("click", function () { setUnit(u, !unitOn(u)); changed(); });
+      (chipEls[u] = chipEls[u] || []).push(b);
+      chips.appendChild(b);
+    });
+    box.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var members = r.p.concat(r.x);
+      var allOn = members.every(unitOn);
+      members.forEach(function (u) { setUnit(u, !allOn); });
+      changed();
+    });
+    head.addEventListener("click", function () { card.classList.toggle("open"); });
+    card.appendChild(head); card.appendChild(chips);
+    root.appendChild(card);
+    cardEls.push({ card: card, box: box, count: count, r: r });
+  });
+}
+function buildPositions() {
+  var root = document.getElementById("positions");
+  DATA.posOrder.forEach(function (i) {
+    var p = DATA.positions[i];
+    var row = document.createElement("div");
+    row.className = "pos";
+    var box = document.createElement("span");
+    box.className = "box";
+    box.setAttribute("role", "checkbox");
+    var txt = document.createElement("div");
+    txt.innerHTML = "<div class='t'></div><div class='d'></div>";
+    txt.querySelector(".t").textContent = p.name;
+    txt.querySelector(".d").textContent = p.desc;
+    row.appendChild(box); row.appendChild(txt);
+    row.addEventListener("click", function () { on[i] = !on[i]; changed(); });
+    root.appendChild(row);
+    p.box = box;
+  });
+}
+function paint() {
+  for (var u = 0; u < nUnit; u++) (chipEls[u] || []).forEach(function (b) {
+    b.classList.toggle("on", unitOn(u));
+    b.setAttribute("aria-pressed", unitOn(u) ? "true" : "false");
+  });
+  cardEls.forEach(function (c) {
+    var members = c.r.p.concat(c.r.x), n = members.filter(unitOn).length;
+    c.count.textContent = n + "/" + members.length;
+    c.box.className = "box" + (n === members.length ? " on" : n ? " part" : "");
+    c.box.textContent = n === members.length ? "✓" : n ? "–" : "";
+    c.box.setAttribute("aria-checked", n === members.length ? "true" : n ? "mixed" : "false");
+  });
+  DATA.positions.forEach(function (p, i) {
+    p.box.className = "box" + (on[i] ? " on" : "");
+    p.box.textContent = on[i] ? "✓" : "";
+    p.box.setAttribute("aria-checked", on[i] ? "true" : "false");
+  });
+  var sum = document.getElementById("summary");
+  sum.innerHTML = "";
+  [["지역", unitsText()], ["포지션", positionsText()]].forEach(function (kv, i) {
+    if (i) sum.appendChild(document.createTextNode(" · "));
+    sum.appendChild(document.createTextNode(kv[0] + " "));
+    var b = document.createElement("b"); b.textContent = kv[1]; sum.appendChild(b);
+  });
+  var empty = !on.slice(0, nPos).some(Boolean) || !on.slice(nPos).some(Boolean);
+  showNotice(!tableOk ? "봇과 이 화면의 지역 표가 다릅니다. 봇이 보낸 버튼을 다시 눌러 열어 주십시오."
+    : !loaded ? "지금 설정을 읽지 못했습니다. 텔레그램의 [감시 지역 변경] 버튼으로 열어 주십시오."
+    : empty ? "지역이나 포지션이 하나도 없으면 알림이 나가지 않습니다." : "");
+}
+function showNotice(t) {
+  var n = document.getElementById("notice");
+  n.textContent = t;
+  n.classList.toggle("hidden", !t);
+}
+function changed() {
+  dirty = true;
+  if (tg && tg.enableClosingConfirmation) tg.enableClosingConfirmation();
+  paint();
+}
+
+// ---- 찾기 ----
+document.getElementById("q").addEventListener("input", function () {
+  var q = this.value.trim();
+  cardEls.forEach(function (c) {
+    var any = false;
+    c.r.p.concat(c.r.x).forEach(function (u) {
+      var hit = !q || DATA.units[u].indexOf(q) >= 0 || (c.r.label || c.r.name).indexOf(q) >= 0;
+      (chipEls[u] || []).forEach(function (b) { if (b.parentNode === c.card.lastChild) b.classList.toggle("hidden", !hit); });
+      any = any || hit;
+    });
+    c.card.classList.toggle("hidden", !!q && !any);
+    if (q) c.card.classList.toggle("open", any);
+  });
+});
+
+// ---- 탭 ----
+function showTab(t) {
+  var region = t !== "pos";
+  document.getElementById("tab-region").setAttribute("aria-selected", region ? "true" : "false");
+  document.getElementById("tab-pos").setAttribute("aria-selected", region ? "false" : "true");
+  document.getElementById("page-region").classList.toggle("hidden", !region);
+  document.getElementById("page-pos").classList.toggle("hidden", region);
+  window.scrollTo(0, 0);
+}
+document.getElementById("tab-region").addEventListener("click", function () { showTab("region"); });
+document.getElementById("tab-pos").addEventListener("click", function () { showTab("pos"); });
+document.getElementById("all-on").addEventListener("click", function () { for (var u = 0; u < nUnit; u++) setUnit(u, true); changed(); });
+document.getElementById("all-off").addEventListener("click", function () { for (var u = 0; u < nUnit; u++) setUnit(u, false); changed(); });
+document.getElementById("pos-all").addEventListener("click", function () { for (var i = 0; i < nPos; i++) on[i] = true; changed(); });
+document.getElementById("pos-none").addEventListener("click", function () { for (var i = 0; i < nPos; i++) on[i] = false; changed(); });
+
+// ---- 저장 ----
+function payload() { return JSON.stringify({ v: DATA.version, h: DATA.hash, s: encodeBits(on) }); }
+function save() {
+  if (!tableOk || !loaded) return;
+  if (inTelegram) {
+    if (tg.disableClosingConfirmation) tg.disableClosingConfirmation();
+    tg.sendData(payload());          // 화면이 닫히고 봇이 web_app_data로 받는다
+  }
+}
+
+// ---- 시작 ----
+(function init() {
+  var p = params();
+  if (p.h && p.h !== DATA.hash) tableOk = false;
+  if (p.s && tableOk) {
+    try { on = decodeBits(p.s); loaded = true; } catch (e) { loaded = false; }
+  }
+  buildRegions();
+  buildPositions();
+  showTab(p.t === "pos" ? "pos" : "region");
+  paint();
+  if (inTelegram) {
+    tg.ready();
+    if (tg.expand) tg.expand();
+    tg.MainButton.setText("저장");
+    tg.MainButton.onClick(save);
+    if (tableOk && loaded) tg.MainButton.show(); else tg.MainButton.hide();
+  } else {
+    var fb = document.getElementById("fallback");
+    fb.classList.remove("hidden");
+    document.getElementById("fallback-why").textContent = "텔레그램의 [감시 지역 변경]·[대상 포지션 변경] 버튼으로 열었을 때만 저장됩니다.";
+  }
+  window.__kmdjob = { payload: payload, save: save, state: function () { return on.slice(); } };
+})();
+</script>
+</body>
+</html>
